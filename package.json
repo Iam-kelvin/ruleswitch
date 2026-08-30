@@ -1,0 +1,56 @@
+{
+  "name": "ruleswitch",
+  "version": "1.0.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "assets": "node scripts/generate-assets.mjs",
+    "start": "expo start",
+    "android": "expo run:android",
+    "web": "expo start --web",
+    "lint": "expo lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "validate": "npm run typecheck && npm run lint && npm test",
+    "build:web": "expo export --platform web && node scripts/finalize-pwa.mjs",
+    "preview:web": "npx serve dist",
+    "build:android": "eas build --platform android --profile production"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@sentry/react-native": "~7.11.0",
+    "expo": "~55.0.30",
+    "expo-asset": "~55.0.20",
+    "expo-audio": "~55.0.18",
+    "expo-constants": "~55.0.17",
+    "expo-haptics": "~55.0.18",
+    "expo-linear-gradient": "~55.0.18",
+    "expo-linking": "~55.0.17",
+    "expo-router": "~55.0.18",
+    "expo-splash-screen": "~55.0.25",
+    "expo-status-bar": "~55.0.6",
+    "posthog-react-native": "4.66.2",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-native": "0.83.10",
+    "react-native-safe-area-context": "~5.6.2",
+    "react-native-screens": "~4.23.0",
+    "react-native-svg": "15.15.3",
+    "react-native-web": "~0.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "@types/react": "~19.2.2",
+    "eslint": "^9.39.0",
+    "eslint-config-expo": "~55.0.1",
+    "typescript": "~5.9.2",
+    "vitest": "3.2.7"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "4.63.1"
+  },
+  "engines": {
+    "node": "^20.19.4 || ^22.13.0 || >=24.3.0"
+  }
+}
