@@ -11,12 +11,26 @@ interface SettingRowProps {
 export function SettingRow({ label, description, value, onValueChange }: SettingRowProps) {
   const palette = usePalette();
   return (
-    <Pressable style={[styles.row, { borderBottomColor: palette.border }]} onPress={() => onValueChange(!value)} accessibilityRole="switch" accessibilityState={{ checked: value }}>
+    <Pressable
+      style={[styles.row, { borderBottomColor: palette.border }]}
+      onPress={() => onValueChange(!value)}
+      accessibilityRole="switch"
+      accessibilityLabel={label}
+      accessibilityHint={description}
+      accessibilityState={{ checked: value }}
+    >
       <View style={styles.copy}>
         <Text style={[styles.label, { color: palette.text }]}>{label}</Text>
         <Text style={[styles.description, { color: palette.textMuted }]}>{description}</Text>
       </View>
-      <Switch value={value} onValueChange={onValueChange} trackColor={{ false: palette.border, true: palette.primary }} thumbColor={value ? '#FFFFFF' : palette.textMuted} />
+      <Switch
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+        pointerEvents="none"
+        value={value}
+        trackColor={{ false: palette.border, true: palette.primary }}
+        thumbColor={value ? '#FFFFFF' : palette.textMuted}
+      />
     </Pressable>
   );
 }

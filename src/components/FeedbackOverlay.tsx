@@ -9,12 +9,20 @@ export function FeedbackOverlay({ state }: { state: FeedbackState }) {
   const correct = state === 'correct';
   const isSwitch = state === 'switch';
   const color = correct ? palette.success : isSwitch ? palette.warning : palette.danger;
+  const foreground = correct ? palette.onSuccess : isSwitch ? palette.onWarning : palette.onDanger;
   const label = correct ? 'NICE!' : isSwitch ? 'RULE SWITCH' : 'RESET & READ';
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill} accessibilityLiveRegion="assertive">
+    <View
+      pointerEvents="none"
+      style={StyleSheet.absoluteFill}
+      accessible
+      accessibilityRole="alert"
+      accessibilityLabel={label}
+      accessibilityLiveRegion="assertive"
+    >
       <View style={[styles.flash, { borderColor: color }]} />
       <View style={[styles.pill, { backgroundColor: color }]}>
-        <Text style={[styles.text, { color: correct ? '#071510' : isSwitch ? '#241800' : '#FFFFFF' }]}>{label}</Text>
+        <Text style={[styles.text, { color: foreground }]}>{label}</Text>
       </View>
     </View>
   );

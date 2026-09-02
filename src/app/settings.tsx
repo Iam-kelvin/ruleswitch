@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AppHeader } from '@/components/AppHeader';
 import { AppScreen } from '@/components/AppScreen';
@@ -17,15 +18,28 @@ export default function SettingsScreen() {
   const router = useRouter();
   const palette = usePalette();
   const { data, updateSettings, resetProgress } = useProgress();
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+
+  const performReset = () => {
+    if (resetting) return;
+    setResetting(true);
+    setResetError(null);
+    void resetProgress()
+      .then(() => router.replace('/tutorial'))
+      .catch(() => setResetError('Progress could not be reset. Your existing local data is unchanged.'))
+      .finally(() => setResetting(false));
+  };
 
   const confirmReset = () => {
     if (Platform.OS === 'web') {
-      if (globalThis.confirm?.('Reset all RuleSwitch progress, achievements, and settings on this device?')) void resetProgress().then(() => router.replace('/tutorial'));
+      const confirmed = typeof globalThis.confirm !== 'function' || globalThis.confirm('Reset all RuleSwitch progress, achievements, and settings on this device?');
+      if (confirmed) performReset();
       return;
     }
     Alert.alert('Reset all progress?', 'This removes local XP, Journey levels, stats, achievements, settings, and Daily results. It cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Reset', style: 'destructive', onPress: () => void resetProgress().then(() => router.replace('/tutorial')) }
+      { text: 'Reset', style: 'destructive', onPress: performReset }
     ]);
   };
 
@@ -36,11 +50,12 @@ export default function SettingsScreen() {
         <SettingRow label="Sound" description="Action, result, switch, streak, and achievement cues." value={data.settings.sound} onValueChange={(sound) => updateSettings({ sound })} />
         <SettingRow label="Background music" description="A quiet, looping offline soundtrack." value={data.settings.music} onValueChange={(music) => updateSettings({ music })} />
         <SettingRow label="Haptics" description="Touch feedback for actions and outcomes." value={data.settings.haptics} onValueChange={(haptics) => updateSettings({ haptics })} />
-        <SettingRow label="Reduced motion" description="Removes route and tutorial transition motion." value={data.settings.reducedMotion} onValueChange={(reducedMotion) => updateSettings({ reducedMotion })} />
+        <SettingRow label="Reduced motion" description="Disables route transitions and scaling feedback." value={data.settings.reducedMotion} onValueChange={(reducedMotion) => updateSettings({ reducedMotion })} />
       </Panel>
 
       <Text style={[styles.section, { color: palette.text }]}>Theme</Text>
       <SegmentedControl<ThemePreference>
+        accessibilityLabel="Theme"
         options={[{ value: 'midnight', label: 'Midnight' }, { value: 'daylight', label: 'Daylight' }, { value: 'highContrast', label: 'High contrast' }]}
         value={data.settings.theme}
         onChange={(theme) => updateSettings({ theme })}
@@ -48,6 +63,7 @@ export default function SettingsScreen() {
 
       <Text style={[styles.section, { color: palette.text }]}>Preferred difficulty</Text>
       <SegmentedControl<Difficulty>
+        accessibilityLabel="Preferred difficulty"
         options={DIFFICULTIES.map((value) => ({ value, label: DIFFICULTY_CONFIG[value].label }))}
         value={data.settings.preferredDifficulty}
         onChange={(preferredDifficulty) => updateSettings({ preferredDifficulty })}
@@ -60,7 +76,8 @@ export default function SettingsScreen() {
       </Panel>
 
       <Text style={[styles.section, { color: palette.danger }]}>Local data</Text>
-      <PrimaryButton label="Reset all progress" variant="danger" onPress={confirmReset} />
+      <PrimaryButton label={resetting ? 'Resetting…' : 'Reset all progress'} variant="danger" disabled={resetting} onPress={confirmReset} />
+      {resetError ? <Text accessibilityRole="alert" style={[styles.resetError, { color: palette.danger }]}>{resetError}</Text> : null}
       <Text style={[styles.version, { color: palette.textMuted }]}>RuleSwitch {Constants.expoConfig?.version ?? '1.0.0'} · Game data v1</Text>
     </AppScreen>
   );
@@ -69,7 +86,12 @@ export default function SettingsScreen() {
 function LinkRow({ label, copy, onPress, last = false }: { label: string; copy: string; onPress(): void; last?: boolean }) {
   const palette = usePalette();
   return (
-    <Pressable onPress={onPress} style={[styles.linkRow, !last && { borderBottomColor: palette.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${label}. ${copy}`}
+      onPress={onPress}
+      style={[styles.linkRow, !last && { borderBottomColor: palette.border, borderBottomWidth: StyleSheet.hairlineWidth }]}
+    >
       <View style={styles.linkCopy}><Text style={[styles.linkLabel, { color: palette.text }]}>{label}</Text><Text style={[styles.linkDescription, { color: palette.textMuted }]}>{copy}</Text></View>
       <Text style={[styles.linkArrow, { color: palette.primary }]}>›</Text>
     </Pressable>
@@ -86,5 +108,6 @@ const styles = StyleSheet.create({
   linkLabel: { fontSize: 15, fontWeight: '800' },
   linkDescription: { fontSize: 12, lineHeight: 17, marginTop: 3 },
   linkArrow: { fontSize: 27, fontWeight: '800' },
+  resetError: { fontSize: 13, lineHeight: 19, marginTop: 10, textAlign: 'center' },
   version: { textAlign: 'center', fontSize: 11, marginTop: 24 }
 });

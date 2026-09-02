@@ -65,7 +65,14 @@ export function applySession(data: ProgressData, incoming: SessionSummary): Appl
     return stat.correct >= 50 && stat.attempts > 0 && stat.correct / stat.attempts >= 0.85;
   });
 
-  if (summary.mode === 'journey' && summary.journeyLevel !== undefined) {
+  if (
+    summary.mode === 'journey' &&
+    summary.journeyLevel !== undefined &&
+    Number.isInteger(summary.journeyLevel) &&
+    summary.journeyLevel >= 1 &&
+    summary.journeyLevel <= JOURNEY_LEVEL_COUNT &&
+    summary.journeyLevel <= progress.journey.unlockedLevel
+  ) {
     const key = String(summary.journeyLevel);
     const previous = progress.journey.levels[key];
     if (!previous || summary.score > previous.score) {

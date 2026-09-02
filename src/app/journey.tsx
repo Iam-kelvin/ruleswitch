@@ -40,10 +40,12 @@ export default function JourneyScreen() {
                 return (
                   <PrimaryButton
                     key={level}
+                    compact
                     label={result ? `✓ ${level}` : unlocked ? String(level) : '🔒'}
                     disabled={!unlocked}
                     variant={result ? 'primary' : 'secondary'}
-                    accessibilityHint={unlocked ? `${chapter.title}, level ${level}` : `Level ${level} is locked`}
+                    accessibilityLabel={`${chapter.title}, level ${level}${result ? ', completed' : unlocked ? '' : ', locked'}`}
+                    accessibilityHint={unlocked ? 'Starts this Journey level' : 'Complete prior levels to unlock'}
                     onPress={() => router.push({ pathname: '/play', params: { mode: 'journey', difficulty: chapter.difficulty, seed: `journey:${level}`, journeyLevel: String(level) } })}
                     style={styles.levelButton}
                   />

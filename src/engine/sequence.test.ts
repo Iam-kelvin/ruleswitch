@@ -15,6 +15,13 @@ describe('seeded procedural generation', () => {
     expect(generateSequence({ ...base, seed: 'a' })).not.toEqual(generateSequence({ ...base, seed: 'b' }));
   });
 
+  it('marks only actual rule changes as switches', () => {
+    const sequence = generateSequence({ seed: 'switch-markers', difficulty: 'normal', mode: 'endless', count: 9 });
+    expect(sequence[0]?.isRuleSwitch).toBe(false);
+    expect(sequence[4]?.isRuleSwitch).toBe(true);
+    expect(sequence[4]?.rule.id).not.toBe(sequence[3]?.rule.id);
+  });
+
   it.each(DIFFICULTIES)('generates large valid batches at %s difficulty', (difficulty: Difficulty) => {
     for (let batch = 0; batch < 8; batch += 1) {
       const sequence = generateSequence({ seed: `batch:${difficulty}:${batch}`, difficulty, mode: 'endless', count: 75 });

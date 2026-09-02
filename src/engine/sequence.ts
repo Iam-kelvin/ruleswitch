@@ -31,8 +31,8 @@ export function generateSequence(options: SequenceOptions): Challenge[] {
   let activeRule: RuleDefinition | null = null;
 
   for (let index = 0; index < options.count; index += 1) {
-    const isRuleSwitch = index === 0 || index % config.switchEvery === 0;
-    if (isRuleSwitch) activeRule = chooseNextRule(rules, activeRule, random.next);
+    const isRuleSwitch = index > 0 && index % config.switchEvery === 0;
+    if (index === 0 || isRuleSwitch) activeRule = chooseNextRule(rules, activeRule, random.next);
     if (!activeRule) throw new Error('Sequence could not select an active rule.');
 
     let objects = [] as ReturnType<typeof generateObjects>;

@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { AppScreen } from '@/components/AppScreen';
 import { FeedbackOverlay } from '@/components/FeedbackOverlay';
 import { GameBoard } from '@/components/GameBoard';
@@ -29,6 +29,8 @@ export default function PlayScreen() {
   const journeyLevel = mode === 'journey' && Number.isInteger(parsedLevel) && parsedLevel >= 1 && parsedLevel <= 35 ? parsedLevel : undefined;
   const router = useRouter();
   const palette = usePalette();
+  const { width, height } = useWindowDimensions();
+  const compactLandscape = width >= 560 && height < 650;
   const { data, completeSession } = useProgress();
   const feedback = useFeedback();
 
@@ -58,7 +60,14 @@ export default function PlayScreen() {
       header={
         <View style={[styles.gameHeader, { backgroundColor: palette.background, borderBottomColor: palette.border }]}>
           <View style={styles.gameHeaderInner}>
-            <Pressable onPress={session.togglePause} accessibilityRole="button" accessibilityLabel="Pause game" style={[styles.pause, { borderColor: palette.border }]}>
+            <Pressable
+              onPress={session.togglePause}
+              accessibilityRole="button"
+              accessibilityLabel="Pause game"
+              accessibilityState={{ disabled: state.inputLocked }}
+              disabled={state.inputLocked}
+              style={[styles.pause, { borderColor: palette.border }, state.inputLocked && styles.pauseDisabled]}
+            >
               <Text style={[styles.pauseText, { color: palette.text }]}>Ⅱ</Text>
             </Pressable>
             <View style={styles.headerStat}><Text style={[styles.headerLabel, { color: palette.textMuted }]}>SCORE</Text><Text style={[styles.headerValue, { color: palette.text }]}>{state.score.toLocaleString()}</Text></View>
@@ -70,11 +79,18 @@ export default function PlayScreen() {
       contentStyle={styles.gameContent}
       testID="game-screen"
     >
-      <View style={styles.ruleWrap}>
-        <Text style={[styles.modeLabel, { color: palette.textMuted }]}>{MODE_CONFIG[mode].label.toUpperCase()} · {DIFFICULTY_CONFIG[difficulty].label.toUpperCase()}</Text>
-        <RuleBanner challenge={challenge} timeRatio={session.promptTimeRatio} />
+      <View style={[styles.playArea, compactLandscape && styles.playAreaLandscape]}>
+        <View style={[styles.ruleWrap, compactLandscape && styles.ruleWrapLandscape]}>
+          <Text style={[styles.modeLabel, { color: palette.textMuted }]}>{MODE_CONFIG[mode].label.toUpperCase()} · {DIFFICULTY_CONFIG[difficulty].label.toUpperCase()}</Text>
+          <RuleBanner challenge={challenge} timeRatio={session.promptTimeRatio} />
+        </View>
+        <GameBoard
+          objects={challenge.objects}
+          onAction={session.act}
+          disabled={state.inputLocked || state.paused}
+          {...(compactLandscape ? { boardMaxWidth: Math.min(500, width * 0.52), boardMaxHeight: Math.max(220, height - 150) } : {})}
+        />
       </View>
-      <GameBoard objects={challenge.objects} onAction={session.act} disabled={state.inputLocked || state.paused} />
       <View style={styles.bottomRow}>
         <Text style={[styles.gestureHint, { color: palette.textMuted }]}>Tap or swipe from an object. Read the rule every time it changes.</Text>
         {mode === 'endless' ? <PrimaryButton label="Finish run" variant="ghost" onPress={session.finish} style={styles.finishButton} /> : null}
@@ -82,7 +98,7 @@ export default function PlayScreen() {
       <FeedbackOverlay state={state.feedback} />
 
       <Modal transparent visible={state.paused} animationType={data.settings.reducedMotion ? 'none' : 'fade'} onRequestClose={session.togglePause}>
-        <View style={styles.modalBackdrop}>
+        <View style={styles.modalBackdrop} accessibilityViewIsModal>
           <View style={[styles.modalCard, { backgroundColor: palette.panel, borderColor: palette.border }]}>
             <Text style={[styles.modalKicker, { color: palette.primary }]}>RUN PAUSED</Text>
             <Text style={[styles.modalTitle, { color: palette.text }]}>Take a breath.</Text>
@@ -106,13 +122,17 @@ function formatTime(milliseconds: number): string {
 const styles = StyleSheet.create({
   gameHeader: { borderBottomWidth: StyleSheet.hairlineWidth, alignItems: 'center' },
   gameHeaderInner: { width: '100%', maxWidth: 960, minHeight: 66, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, gap: 10 },
-  pause: { width: 43, height: 43, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  pause: { width: 48, height: 48, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  pauseDisabled: { opacity: 0.5 },
   pauseText: { fontSize: 18, fontWeight: '900', letterSpacing: -2 },
   headerStat: { flex: 1, alignItems: 'center' },
   headerLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1 },
   headerValue: { fontSize: 16, fontWeight: '900', marginTop: 2 },
-  gameContent: { maxWidth: 720, paddingTop: 10, paddingBottom: 10 },
+  gameContent: { maxWidth: 960, paddingTop: 10, paddingBottom: 10 },
+  playArea: { width: '100%', alignItems: 'center' },
+  playAreaLandscape: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', gap: 18 },
   ruleWrap: { width: '100%', zIndex: 2 },
+  ruleWrapLandscape: { flex: 1, maxWidth: 410 },
   modeLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2, marginBottom: 7, marginLeft: 3 },
   bottomRow: { marginTop: 'auto', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   gestureHint: { flex: 1, fontSize: 11, lineHeight: 16 },

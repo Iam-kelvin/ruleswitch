@@ -16,16 +16,16 @@ export default function AchievementsScreen() {
     <AppScreen header={<AppHeader title="Achievements" subtitle={`${unlockedCount} of ${ACHIEVEMENTS.length} unlocked`} />}>
       <Panel style={styles.overview}>
         <View style={styles.overviewTop}><Text style={[styles.overviewTitle, { color: palette.text }]}>Collection progress</Text><Text style={[styles.overviewValue, { color: palette.primary }]}>{Math.round((unlockedCount / ACHIEVEMENTS.length) * 100)}%</Text></View>
-        <ProgressBar value={unlockedCount / ACHIEVEMENTS.length} />
+        <ProgressBar accessibilityLabel="Achievement collection progress" value={unlockedCount / ACHIEVEMENTS.length} />
       </Panel>
       <View style={[styles.grid, width >= 720 && styles.gridWide]}>
         {ACHIEVEMENTS.map((achievement) => {
           const unlockedAt = data.achievements[achievement.id];
           const progress = Math.min(achievement.target, achievement.progress(data));
           return (
-            <Panel key={achievement.id} style={[styles.card, width >= 720 && styles.cardWide, !unlockedAt && styles.locked]}>
+            <Panel key={achievement.id} style={[styles.card, width >= 720 && styles.cardWide]}>
               <View style={[styles.icon, { backgroundColor: unlockedAt ? palette.warning : palette.panelStrong, borderColor: unlockedAt ? palette.warning : palette.border }]}>
-                <Text style={[styles.iconText, { color: unlockedAt ? '#241800' : palette.textMuted }]}>{unlockedAt ? achievement.icon : '●'}</Text>
+                <Text style={[styles.iconText, { color: unlockedAt ? palette.onWarning : palette.textMuted }]}>{unlockedAt ? achievement.icon : '●'}</Text>
               </View>
               <View style={styles.copy}>
                 <Text style={[styles.title, { color: palette.text }]}>{achievement.title}</Text>
@@ -33,7 +33,7 @@ export default function AchievementsScreen() {
                 {unlockedAt ? (
                   <Text style={[styles.unlocked, { color: palette.success }]}>UNLOCKED · {new Date(unlockedAt).toLocaleDateString()}</Text>
                 ) : (
-                  <View style={styles.progressWrap}><ProgressBar value={progress / achievement.target} color={palette.secondary} /><Text style={[styles.progressText, { color: palette.textMuted }]}>{progress} / {achievement.target}</Text></View>
+                  <View style={styles.progressWrap}><ProgressBar accessibilityLabel={`${achievement.title} progress`} value={progress / achievement.target} color={palette.secondary} /><Text style={[styles.progressText, { color: palette.textMuted }]}>{progress} / {achievement.target}</Text></View>
                 )}
               </View>
             </Panel>
@@ -53,7 +53,6 @@ const styles = StyleSheet.create({
   gridWide: { flexDirection: 'row', flexWrap: 'wrap' },
   card: { flexDirection: 'row', gap: 14, padding: 15 },
   cardWide: { width: '48.9%', flexGrow: 1 },
-  locked: { opacity: 0.78 },
   icon: { width: 52, height: 52, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   iconText: { fontSize: 20, fontWeight: '900' },
   copy: { flex: 1 },

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readdirSync, statSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 
 const outputDirectory = resolve(process.cwd(), 'dist');
@@ -23,10 +23,11 @@ for (const file of files) {
   else if (file.endsWith('.html')) urls.add(`/${file.slice(0, -5)}`);
 }
 
-const fingerprint = createHash('sha256')
-  .update(files.map((file) => `${file}:${statSync(resolve(outputDirectory, file)).size}`).join('|'))
-  .digest('hex')
-  .slice(0, 12);
+const fingerprintHash = createHash('sha256');
+for (const file of files) {
+  fingerprintHash.update(file).update('\0').update(readFileSync(resolve(outputDirectory, file))).update('\0');
+}
+const fingerprint = fingerprintHash.digest('hex').slice(0, 12);
 
 const serviceWorker = `const CACHE_NAME = 'ruleswitch-${fingerprint}';
 const PRECACHE_URLS = ${JSON.stringify([...urls], null, 2)};

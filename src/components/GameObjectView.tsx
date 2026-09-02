@@ -3,7 +3,7 @@ import { PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, Line, Pattern, Polygon, Rect, Text as SvgText } from 'react-native-svg';
 import { OBJECT_COLORS } from '@/constants/theme';
 import type { ActionType, GameObject, ShapeName } from '@/engine/types';
-import { usePalette } from '@/hooks/usePalette';
+import { usePalette, useReducedMotion } from '@/hooks/usePalette';
 
 interface GameObjectViewProps {
   object: GameObject;
@@ -32,11 +32,13 @@ function accessibleDescription(object: GameObject): string {
   const content = object.kind === 'number' ? `number ${object.number}` : object.kind === 'symbol' ? `symbol ${object.symbol}` : object.shape;
   const container = object.containerShape === 'none' ? '' : `, inside a ${object.containerShape}`;
   const vertical = object.position.y < 0.5 ? 'above center' : 'below center';
-  return `${object.color} ${content}, ${object.shape} carrier${container}, ${vertical}`;
+  const size = object.size < 1 ? 'small' : object.size > 1 ? 'large' : 'medium';
+  return `${size} ${object.color} ${content}, ${object.fill} ${object.shape} carrier${container}, ${vertical}`;
 }
 
 export function GameObjectView({ object, onAction, disabled = false, compact = false }: GameObjectViewProps) {
   const palette = usePalette();
+  const reducedMotion = useReducedMotion();
   const color = OBJECT_COLORS[object.color];
   const panResponder = useMemo(
     () =>
@@ -63,13 +65,27 @@ export function GameObjectView({ object, onAction, disabled = false, compact = f
       accessibilityRole="button"
       accessibilityLabel={accessibleDescription(object)}
       accessibilityHint="Tap or swipe this object according to the current rule."
+      accessibilityActions={[
+        { name: 'activate', label: 'Tap object' },
+        { name: 'swipeLeft', label: 'Swipe object left' },
+        { name: 'swipeRight', label: 'Swipe object right' },
+        { name: 'swipeUp', label: 'Swipe object up' },
+        { name: 'swipeDown', label: 'Swipe object down' }
+      ]}
+      accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={() => onAction('tap')}
+      onAccessibilityAction={(event) => {
+        if (disabled) return;
+        const action = event.nativeEvent.actionName;
+        if (action === 'activate') onAction('tap');
+        else if (action === 'swipeLeft' || action === 'swipeRight' || action === 'swipeUp' || action === 'swipeDown') onAction(action);
+      }}
       style={({ pressed }) => [
         styles.card,
         compact && styles.compactCard,
         { backgroundColor: palette.panelStrong, borderColor: object.containerShape === 'none' ? palette.border : color.fill },
-        pressed && !disabled && styles.pressed,
+        pressed && !disabled && (reducedMotion ? styles.pressedReduced : styles.pressed),
         disabled && styles.disabled
       ]}
     >
@@ -123,12 +139,13 @@ const styles = StyleSheet.create({
     paddingTop: 9,
     overflow: 'hidden'
   },
-  compactCard: { width: 96, height: 116 },
+  compactCard: { width: 88, height: 104 },
   cues: { position: 'absolute', top: 8, left: 8, right: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   colorCue: { width: 25, height: 25, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   cueText: { fontSize: 12, fontWeight: '900' },
   positionCue: { fontSize: 9, fontWeight: '900', letterSpacing: 0.6 },
   containerCue: { position: 'absolute', bottom: 7, fontSize: 9, fontWeight: '900', letterSpacing: 0.6 },
   pressed: { opacity: 0.75, transform: [{ scale: 0.96 }] },
+  pressedReduced: { opacity: 0.75 },
   disabled: { opacity: 0.72 }
 });

@@ -46,6 +46,16 @@ describe('saved progression', () => {
     expect(replay.journey.levels['1']?.score).toBe(500);
   });
 
+  it('does not allow a forged Journey result to skip locked levels', () => {
+    const result = applySession(
+      createDefaultProgress(),
+      summary({ mode: 'journey', journeyLevel: 35, difficulty: 'master', score: 50_000 })
+    );
+    expect(result.progress.journey.unlockedLevel).toBe(1);
+    expect(result.progress.journey.levels['35']).toBeUndefined();
+    expect(result.summary.newAchievementIds).not.toContain('master-cleared');
+  });
+
   it('stores only the first official Daily result', () => {
     const first = applySession(createDefaultProgress(), summary({ mode: 'daily', seed: 'daily:2026-08-29', score: 1000 }));
     expect(first.summary.officialDaily).toBe(true);

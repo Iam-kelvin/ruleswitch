@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { AppScreen } from '@/components/AppScreen';
 import { FeedbackOverlay, type FeedbackState } from '@/components/FeedbackOverlay';
 import { GameBoard } from '@/components/GameBoard';
@@ -57,10 +57,13 @@ const TUTORIAL_DATA = [
 export default function TutorialScreen() {
   const router = useRouter();
   const palette = usePalette();
+  const { height } = useWindowDimensions();
   const { data, completeTutorial } = useProgress();
   const feedbackService = useFeedback();
   const [step, setStep] = useState(0);
   const [feedback, setFeedback] = useState<FeedbackState>('switch');
+  const [inputLocked, setInputLocked] = useState(false);
+  const inputLockedRef = useRef(false);
   const [message, setMessage] = useState('Try it now.');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tutorial = TUTORIAL_DATA[step]!;
@@ -68,11 +71,11 @@ export default function TutorialScreen() {
   useEffect(() => {
     track('tutorial_started');
     feedbackService.result('rule');
-    timerRef.current = setTimeout(() => setFeedback(null), 650);
+    timerRef.current = setTimeout(() => setFeedback(null), data.settings.reducedMotion ? 180 : 650);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [feedbackService]);
+  }, [data.settings.reducedMotion, feedbackService]);
 
   const challenge = useMemo<Challenge>(() => {
     const rule = getRuleById(tutorial.ruleId)!;
@@ -89,13 +92,21 @@ export default function TutorialScreen() {
   }, [step, tutorial]);
 
   const act = (objectId: string, action: ActionType) => {
+    if (inputLockedRef.current) return;
     const correct = challenge.expectedTargets.some((target) => target.objectId === objectId && target.action === action);
+    inputLockedRef.current = true;
+    setInputLocked(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
     feedbackService.input(action);
     feedbackService.result(correct ? 'correct' : 'incorrect');
     setFeedback(correct ? 'correct' : 'incorrect');
     setMessage(correct ? 'Exactly right.' : 'Pause, reread the rule, and try again.');
     if (!correct) {
-      timerRef.current = setTimeout(() => setFeedback(null), data.settings.reducedMotion ? 180 : 420);
+      timerRef.current = setTimeout(() => {
+        setFeedback(null);
+        inputLockedRef.current = false;
+        setInputLocked(false);
+      }, data.settings.reducedMotion ? 180 : 420);
       return;
     }
     timerRef.current = setTimeout(() => {
@@ -107,7 +118,11 @@ export default function TutorialScreen() {
         setFeedback('switch');
         setMessage('New rule—clear the old one.');
         feedbackService.result('rule');
-        timerRef.current = setTimeout(() => setFeedback(null), data.settings.reducedMotion ? 180 : 650);
+        timerRef.current = setTimeout(() => {
+          setFeedback(null);
+          inputLockedRef.current = false;
+          setInputLocked(false);
+        }, data.settings.reducedMotion ? 180 : 650);
       }
     }, data.settings.reducedMotion ? 220 : 650);
   };
@@ -118,19 +133,26 @@ export default function TutorialScreen() {
   };
 
   return (
-    <AppScreen scroll={false} contentStyle={styles.content}>
+    <AppScreen scroll={height < 680} contentStyle={styles.content}>
       <View style={styles.topRow}>
         <View style={styles.progressCopy}><Text style={[styles.kicker, { color: palette.primary }]}>QUICK TUTORIAL</Text><Text style={[styles.step, { color: palette.text }]}>Step {step + 1} of {TUTORIAL_DATA.length}</Text></View>
-        <Pressable onPress={skip} hitSlop={10}><Text style={[styles.skip, { color: palette.textMuted }]}>Skip tutorial</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Skip tutorial" onPress={skip} hitSlop={10} style={styles.skipButton}>
+          <Text style={[styles.skip, { color: palette.textMuted }]}>Skip tutorial</Text>
+        </Pressable>
       </View>
-      <ProgressBar value={(step + 1) / TUTORIAL_DATA.length} />
+      <ProgressBar accessibilityLabel="Tutorial progress" value={(step + 1) / TUTORIAL_DATA.length} />
       <View style={styles.lesson}>
         <Text style={[styles.title, { color: palette.text }]}>{tutorial.title}</Text>
         <Text style={[styles.copy, { color: palette.textMuted }]}>{tutorial.copy}</Text>
       </View>
       <RuleBanner challenge={challenge} timeRatio={1} />
-      <GameBoard objects={challenge.objects} onAction={act} />
-      <Text accessibilityLiveRegion="polite" style={[styles.message, { color: message === 'Exactly right.' ? palette.success : palette.textMuted }]}>{message}</Text>
+      <GameBoard objects={challenge.objects} onAction={act} disabled={inputLocked} />
+      <Text
+        accessibilityLiveRegion="polite"
+        style={[styles.message, { color: feedback === 'correct' ? palette.success : feedback === 'incorrect' ? palette.danger : palette.textMuted }]}
+      >
+        {message}
+      </Text>
       <FeedbackOverlay state={feedback} />
     </AppScreen>
   );
@@ -142,6 +164,7 @@ const styles = StyleSheet.create({
   progressCopy: { flex: 1 },
   kicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.3 },
   step: { fontSize: 17, fontWeight: '900', marginTop: 3 },
+  skipButton: { minHeight: 48, minWidth: 104, alignItems: 'flex-end', justifyContent: 'center' },
   skip: { fontSize: 13, fontWeight: '700' },
   lesson: { marginTop: 17, marginBottom: 15 },
   title: { fontSize: 24, fontWeight: '900' },

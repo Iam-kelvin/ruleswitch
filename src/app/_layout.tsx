@@ -46,10 +46,18 @@ function Bootstrap() {
         <Text style={[styles.errorIcon, { color: palette.danger }]}>!</Text>
         <Text style={[styles.loadingTitle, { color: palette.text }]}>Progress needs attention</Text>
         <Text style={[styles.loadingCopy, { color: palette.textMuted }]}>{error}</Text>
-        <Pressable onPress={retryLoad} style={[styles.bootstrapButton, { backgroundColor: palette.primary }]}>
-          <Text style={styles.bootstrapButtonText}>Try again</Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={retryLoad}
+          style={[styles.bootstrapButton, { backgroundColor: palette.primary }]}
+        >
+          <Text style={[styles.bootstrapButtonText, { color: palette.onPrimary }]}>Try again</Text>
         </Pressable>
-        <Pressable onPress={useFreshProgress} style={[styles.bootstrapGhost, { borderColor: palette.border }]}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={useFreshProgress}
+          style={[styles.bootstrapGhost, { borderColor: palette.border }]}
+        >
           <Text style={[styles.bootstrapGhostText, { color: palette.text }]}>Start with fresh local progress</Text>
         </Pressable>
       </View>
@@ -80,7 +88,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
     <View style={styles.bootstrap}>
       <Text style={styles.fallbackTitle}>RuleSwitch hit an unexpected error.</Text>
       <Text style={styles.fallbackCopy}>Your saved progress is still on this device.</Text>
-      <Pressable onPress={retry} style={styles.fallbackButton}><Text style={styles.bootstrapButtonText}>Reload screen</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={retry} style={styles.fallbackButton}><Text style={styles.bootstrapButtonText}>Reload screen</Text></Pressable>
     </View>
   );
 }

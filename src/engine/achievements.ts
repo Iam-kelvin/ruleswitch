@@ -21,7 +21,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     description: 'Successfully finish a run with a rule change.',
     icon: '↔',
     target: 1,
-    progress: (data) => (data.totals.sessions > 0 ? 1 : 0),
+    progress: (data) => (data.achievements['first-switch'] ? 1 : 0),
     unlocked: (_data, session) => session.ruleSwitches > 0 && session.correctActions > 0
   },
   {

@@ -47,7 +47,7 @@ export default function ResultsScreen() {
         <Text style={[styles.scoreLabel, { color: palette.textMuted }]}>POINTS</Text>
         {result.mode === 'daily' ? (
           <View style={[styles.official, { backgroundColor: result.officialDaily ? palette.primary : palette.panelStrong }]}>
-            <Text style={[styles.officialText, { color: result.officialDaily ? '#071510' : palette.text }]}>{result.officialDaily ? 'OFFICIAL RESULT SAVED' : 'REPLAY · OFFICIAL RESULT UNCHANGED'}</Text>
+            <Text style={[styles.officialText, { color: result.officialDaily ? palette.onPrimary : palette.text }]}>{result.officialDaily ? 'OFFICIAL RESULT SAVED' : 'REPLAY · OFFICIAL RESULT UNCHANGED'}</Text>
           </View>
         ) : null}
       </View>
@@ -118,10 +118,10 @@ const styles = StyleSheet.create({
   stat: { width: '48%', flexGrow: 1, minWidth: 140, alignItems: 'center', paddingVertical: 17 },
   statValue: { fontSize: 22, fontWeight: '900' },
   statLabel: { fontSize: 11, marginTop: 4 },
-  xpPanel: { marginTop: 13, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 16 },
+  xpPanel: { marginTop: 13, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 16 },
   xpKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
   xp: { fontSize: 22, fontWeight: '900', marginTop: 3 },
-  sessionCopy: { flex: 1, fontSize: 12, lineHeight: 18, textAlign: 'right' },
+  sessionCopy: { flex: 1, minWidth: 180, fontSize: 12, lineHeight: 18, textAlign: 'right' },
   unlockPanel: { marginTop: 13, gap: 8 },
   unlockKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 1.3 },
   unlockTitle: { fontSize: 18, fontWeight: '900' },

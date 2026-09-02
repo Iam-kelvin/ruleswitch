@@ -17,6 +17,9 @@ import { track } from '@/services/analytics';
 import { useFeedback } from '@/services/FeedbackProvider';
 
 const EMPTY_RESULT = (): CategorySessionResult => ({ attempts: 0, correct: 0, totalResponseTimeMs: 0, bestResponseTimeMs: null });
+// A multiple of every configured switch interval keeps switch cadence aligned
+// when very long sessions need another deterministic batch.
+const SEQUENCE_BATCH_SIZE = 60;
 
 interface SessionOptions {
   mode: GameMode;
@@ -94,7 +97,13 @@ export function useGameSession({ mode, difficulty, seed, journeyLevel, onComplet
   const targetCorrect = mode === 'journey' && journeyLevel ? getJourneySessionLength(journeyLevel) : MODE_CONFIG[mode].sessionLength;
   const sequenceRef = useRef<Challenge[]>([]);
   if (sequenceRef.current.length === 0) {
-    sequenceRef.current = generateSequence({ seed, difficulty, mode, count: 500, ...(journeyLevel ? { journeyLevel } : {}) });
+    sequenceRef.current = generateSequence({
+      seed,
+      difficulty,
+      mode,
+      count: SEQUENCE_BATCH_SIZE,
+      ...(journeyLevel ? { journeyLevel } : {})
+    });
   }
 
   const startedAtRef = useRef(new Date());
@@ -106,6 +115,17 @@ export function useGameSession({ mode, difficulty, seed, journeyLevel, onComplet
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [state, setState] = useState(() => initialState(config.promptTimeMs, MODE_CONFIG[mode].timeLimitMs));
   const stateRef = useRef(state);
+
+  const getOverallRemainingMs = useCallback((): number | null => {
+    const limit = MODE_CONFIG[mode].timeLimitMs;
+    if (limit === null) return null;
+    const now = Date.now();
+    const activePauseMs = pausedAtRef.current === null ? 0 : now - pausedAtRef.current;
+    return Math.max(
+      0,
+      limit - (now - startedAtRef.current.getTime() - pausedTotalRef.current - activePauseMs) - timePenaltyRef.current
+    );
+  }, [mode]);
 
   const update = useCallback((producer: (current: InternalState) => InternalState) => {
     const next = producer(stateRef.current);
@@ -149,23 +169,42 @@ export function useGameSession({ mode, difficulty, seed, journeyLevel, onComplet
   const advance = useCallback(() => {
     if (completedRef.current) return;
     const current = stateRef.current;
+    if (getOverallRemainingMs() === 0) {
+      finish();
+      return;
+    }
     if ((mode === 'journey' || mode === 'daily') && current.correctActions >= targetCorrect) {
       finish();
       return;
     }
     const nextIndex = current.index + 1;
     if (nextIndex >= sequenceRef.current.length) {
-      const extension = generateSequence({
-        seed: `${seed}:extension:${Math.floor(nextIndex / 500)}`,
-        difficulty,
-        mode,
-        count: 500,
-        ...(journeyLevel ? { journeyLevel } : {})
-      }).map((challenge, offset) => ({ ...challenge, index: nextIndex + offset }));
+      const batch = Math.floor(nextIndex / SEQUENCE_BATCH_SIZE);
+      let generationAttempt = 0;
+      let extension: Challenge[];
+      do {
+        extension = generateSequence({
+          seed: `${seed}:extension:${batch}:${generationAttempt}`,
+          difficulty,
+          mode,
+          count: SEQUENCE_BATCH_SIZE,
+          ...(journeyLevel ? { journeyLevel } : {})
+        });
+        generationAttempt += 1;
+      } while (
+        extension[0]?.rule.id === sequenceRef.current[nextIndex - 1]?.rule.id &&
+        generationAttempt < 32
+      );
+      const boundaryIsRuleSwitch = extension[0]?.rule.id !== sequenceRef.current[nextIndex - 1]?.rule.id;
+      extension = extension.map((challenge, offset) => ({
+        ...challenge,
+        index: nextIndex + offset,
+        isRuleSwitch: (offset === 0 && boundaryIsRuleSwitch) || challenge.isRuleSwitch
+      }));
       sequenceRef.current.push(...extension);
     }
     const nextChallenge = sequenceRef.current[nextIndex]!;
-    promptStartedRef.current = Date.now();
+    promptStartedRef.current = current.paused && pausedAtRef.current !== null ? pausedAtRef.current : Date.now();
     update((value) => ({
       ...value,
       index: nextIndex,
@@ -178,14 +217,23 @@ export function useGameSession({ mode, difficulty, seed, journeyLevel, onComplet
       track('rule_changed', { rule_type: nextChallenge.rule.category, rule_id: nextChallenge.rule.id });
       track('rule_type', { rule_type: nextChallenge.rule.category, rule_id: nextChallenge.rule.id });
       const clearDelay = stateRef.current.paused ? 0 : 700;
-      if (clearDelay) setTimeout(() => update((value) => ({ ...value, feedback: null })), clearDelay);
+      if (clearDelay) {
+        setTimeout(
+          () => update((value) => (value.feedback === 'switch' ? { ...value, feedback: null } : value)),
+          clearDelay
+        );
+      }
     }
-  }, [difficulty, feedbackService, finish, journeyLevel, mode, seed, targetCorrect, update]);
+  }, [difficulty, feedbackService, finish, getOverallRemainingMs, journeyLevel, mode, seed, targetCorrect, update]);
 
   const resolveAttempt = useCallback(
     (objectId: string | null, action: ActionType | null, timedOut = false) => {
       const before = stateRef.current;
       if (before.inputLocked || before.paused || completedRef.current) return;
+      if (getOverallRemainingMs() === 0) {
+        finish();
+        return;
+      }
       const challenge = sequenceRef.current[before.index]!;
       const correct = !timedOut && challenge.expectedTargets.some((target) => target.objectId === objectId && target.action === action);
       const responseTimeMs = timedOut ? challenge.timeLimitMs : Math.min(challenge.timeLimitMs, Math.max(1, Date.now() - promptStartedRef.current));
@@ -237,12 +285,12 @@ export function useGameSession({ mode, difficulty, seed, journeyLevel, onComplet
         else advance();
       }, delay);
     },
-    [advance, difficulty, feedbackService, finish, mode, targetCorrect, update]
+    [advance, difficulty, feedbackService, finish, getOverallRemainingMs, mode, targetCorrect, update]
   );
 
   const togglePause = useCallback(() => {
     const current = stateRef.current;
-    if (current.inputLocked || completedRef.current) return;
+    if (completedRef.current) return;
     if (current.paused) {
       const now = Date.now();
       const pausedFor = pausedAtRef.current ? now - pausedAtRef.current : 0;
@@ -263,7 +311,10 @@ export function useGameSession({ mode, difficulty, seed, journeyLevel, onComplet
     if (mode === 'daily') track('daily_started', { difficulty });
     if (mode === 'timeAttack') track('time_attack_started', { difficulty });
     if (mode === 'noMistakes') track('no_mistakes_started', { difficulty });
-    const clear = setTimeout(() => update((value) => ({ ...value, feedback: null })), 700);
+    const clear = setTimeout(
+      () => update((value) => (value.feedback === 'switch' ? { ...value, feedback: null } : value)),
+      700
+    );
     return () => clearTimeout(clear);
   }, [difficulty, feedbackService, mode, update]);
 
@@ -274,14 +325,13 @@ export function useGameSession({ mode, difficulty, seed, journeyLevel, onComplet
       const now = Date.now();
       const challenge = sequenceRef.current[current.index]!;
       const promptRemainingMs = Math.max(0, challenge.timeLimitMs - (now - promptStartedRef.current));
-      const limit = MODE_CONFIG[mode].timeLimitMs;
-      const overallRemainingMs = limit === null ? null : Math.max(0, limit - (now - startedAtRef.current.getTime() - pausedTotalRef.current) - timePenaltyRef.current);
+      const overallRemainingMs = getOverallRemainingMs();
       update((value) => ({ ...value, promptRemainingMs, overallRemainingMs }));
       if (overallRemainingMs !== null && overallRemainingMs <= 0) finish();
       else if (promptRemainingMs <= 0) resolveAttempt(null, null, true);
     }, 100);
     return () => clearInterval(timer);
-  }, [finish, mode, resolveAttempt, update]);
+  }, [finish, getOverallRemainingMs, resolveAttempt, update]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {

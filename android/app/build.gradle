@@ -4,6 +4,24 @@ apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
+def signingValue = { propertyName, environmentName ->
+    def value = findProperty(propertyName)
+    value != null ? value.toString() : System.getenv(environmentName)
+}
+
+def releaseStoreFile = signingValue('ruleswitchUploadStoreFile', 'RULESWITCH_UPLOAD_STORE_FILE')
+def releaseStorePassword = signingValue('ruleswitchUploadStorePassword', 'RULESWITCH_UPLOAD_STORE_PASSWORD')
+def releaseKeyAlias = signingValue('ruleswitchUploadKeyAlias', 'RULESWITCH_UPLOAD_KEY_ALIAS')
+def releaseKeyPassword = signingValue('ruleswitchUploadKeyPassword', 'RULESWITCH_UPLOAD_KEY_PASSWORD')
+def releaseSigningValues = [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword]
+def hasReleaseSigning = releaseSigningValues.every { it != null && !it.isBlank() }
+def hasPartialReleaseSigning = releaseSigningValues.any { it != null && !it.isBlank() } && !hasReleaseSigning
+def allowDebugReleaseSigning = (signingValue('ruleswitchAllowDebugReleaseSigning', 'RULESWITCH_ALLOW_DEBUG_RELEASE_SIGNING') ?: 'false').toBoolean()
+
+if (hasPartialReleaseSigning) {
+    throw new GradleException('RuleSwitch release signing is incomplete. Set all four RULESWITCH_UPLOAD_* values.')
+}
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -108,15 +126,26 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        if (hasReleaseSigning) {
+            release {
+                storeFile rootProject.file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            } else if (allowDebugReleaseSigning) {
+                // Explicit opt-in for installable QA APKs only. Never publish this artifact.
+                signingConfig signingConfigs.debug
+            }
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

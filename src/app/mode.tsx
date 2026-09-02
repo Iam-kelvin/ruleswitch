@@ -37,6 +37,7 @@ export default function ModeSetupScreen() {
 
       <Text style={[styles.section, { color: palette.text }]}>Difficulty</Text>
       <SegmentedControl<Difficulty>
+        accessibilityLabel="Difficulty"
         options={DIFFICULTIES.map((value) => ({ value, label: DIFFICULTY_CONFIG[value].label }))}
         value={difficulty}
         onChange={setDifficulty}

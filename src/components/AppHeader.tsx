@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { usePalette } from '@/hooks/usePalette';
+import { usePalette, useReducedMotion } from '@/hooks/usePalette';
 
 interface AppHeaderProps {
   title: string;
@@ -12,6 +12,7 @@ interface AppHeaderProps {
 export function AppHeader({ title, subtitle, back = true, right }: AppHeaderProps) {
   const router = useRouter();
   const palette = usePalette();
+  const reducedMotion = useReducedMotion();
   return (
     <View style={[styles.shell, { borderBottomColor: palette.border, backgroundColor: palette.background }]}>
       <View style={styles.inner}>
@@ -20,8 +21,8 @@ export function AppHeader({ title, subtitle, back = true, right }: AppHeaderProp
             accessibilityRole="button"
             accessibilityLabel="Go back"
             hitSlop={12}
-            onPress={() => router.back()}
-            style={({ pressed }) => [styles.back, { borderColor: palette.border }, pressed && styles.pressed]}
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+            style={({ pressed }) => [styles.back, { borderColor: palette.border }, pressed && (reducedMotion ? styles.pressedReduced : styles.pressed)]}
           >
             <Text style={[styles.backText, { color: palette.text }]}>‹</Text>
           </Pressable>
@@ -47,5 +48,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 19, fontWeight: '800', letterSpacing: 0.2 },
   subtitle: { fontSize: 12, marginTop: 2 },
   right: { minWidth: 44, alignItems: 'flex-end' },
-  pressed: { opacity: 0.65, transform: [{ scale: 0.97 }] }
+  pressed: { opacity: 0.65, transform: [{ scale: 0.97 }] },
+  pressedReduced: { opacity: 0.65 }
 });

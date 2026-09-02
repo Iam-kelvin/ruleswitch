@@ -19,6 +19,7 @@ describe('scoring and progression math', () => {
   });
 
   it('keeps XP and level thresholds monotonic', () => {
+    expect(calculateXp(0, 0, 'beginner')).toBe(0);
     expect(calculateXp(1000, 10, 'hard')).toBeGreaterThan(0);
     for (let level = 1; level < 20; level += 1) {
       expect(xpForNextLevel(level)).toBeGreaterThan(xpForLevel(level));

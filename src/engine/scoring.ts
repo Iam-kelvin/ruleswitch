@@ -25,7 +25,7 @@ export function applyScore(currentScore: number, delta: number): number {
 
 export function calculateXp(score: number, correctActions: number, difficulty: Difficulty): number {
   const multiplier = DIFFICULTY_CONFIG[difficulty].scoreMultiplier;
-  return Math.max(1, Math.round(score / 12 + correctActions * 4 * multiplier));
+  return Math.max(0, Math.round(score / 12 + correctActions * 4 * multiplier));
 }
 
 export function levelFromXp(xp: number): number {

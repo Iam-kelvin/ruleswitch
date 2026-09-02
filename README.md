@@ -72,30 +72,62 @@ npm run build:web
 npm run preview:web
 ```
 
-Expo exports the static site to `dist/`. Deploy that directory to any static host such as Cloudflare Pages, Netlify, Vercel static hosting, or an object-storage/CDN setup. Configure the host to serve generated `.html` routes normally. The build script copies the PWA manifest, then fingerprints and precaches every exported route and asset in the generated `dist/sw.js`. Installed clients receive a new cache automatically whenever exported content changes.
+Expo exports the static site to `dist/`. Deploy that directory to any static host such as Cloudflare Pages, Netlify, Vercel static hosting, or an object-storage/CDN setup. Configure clean paths such as `/settings` to serve the matching `settings.html`, with `index.html` as the final navigation fallback. The build script copies the PWA manifest, then content-fingerprints and precaches every exported route and asset in the generated `dist/sw.js`. Installed clients receive a new cache automatically whenever exported content changes. A service worker requires HTTPS outside localhost.
+
+### Coolify
+
+No RuleSwitch API, database, account service, persistent volume, or server secret is required. The checked-in multi-stage `Dockerfile` performs the static Expo export and serves it through the checked-in Nginx configuration. This is preferable to a generic static preset in Coolify because it guarantees clean Expo Router paths, safe cache behavior for the service worker, immutable caching for fingerprinted bundles, and a health endpoint.
+
+Create a Coolify **Dockerfile** application from this repository with:
+
+- Dockerfile location: `/Dockerfile`
+- Exposed/container port: `80`
+- Health-check path: `/healthz`
+- Health-check expected status: `200`
+- Build command, start command, and persistent volumes: leave unset; the image defines them
+- Domain: your chosen HTTPS domain; enable Coolify's automatic TLS certificate
+
+Optional values must be marked as **build variables** in Coolify because Expo embeds `EXPO_PUBLIC_*` values during `docker build`. They are public client configuration, not secrets:
+
+| Variable | Value |
+| --- | --- |
+| `EXPO_PUBLIC_POSTHOG_KEY` | Leave empty to disable analytics, or use the PostHog project key (normally starts with `phc_`) |
+| `EXPO_PUBLIC_POSTHOG_HOST` | `https://us.i.posthog.com` for PostHog US, or your PostHog region/self-hosted ingest URL |
+| `EXPO_PUBLIC_SENTRY_DSN` | Leave empty to disable crash uploads, or use the client DSN from the Sentry project settings |
+
+Do not add `SENTRY_AUTH_TOKEN`, Android keystore passwords, or any other private credential to the web application's build arguments. For a resource-conscious Coolify deployment, allocate one build CPU and about 2 GB of build memory; the final Nginx container normally needs only a small fraction of that at runtime.
 
 ## Android builds
 
-### Ready-to-install APK
+### Ready-to-install QA APK
 
-The locally built APK is available at [`artifacts/RuleSwitch-1.0.0-arm64.apk`](artifacts/RuleSwitch-1.0.0-arm64.apk). It supports 64-bit ARM Android devices running Android 7.0 (API 24) or newer.
+The native build targets 64-bit ARM Android devices running Android 7.0 (API 24) or newer. A fresh checkout does not include `android/app/debug.keystore`; Expo prebuild or the release builder must create that ignored local development key first. Then create a release-mode APK signed with it for direct QA installation only:
+
+```bash
+cd android
+RULESWITCH_ALLOW_DEBUG_RELEASE_SIGNING=true ./gradlew --no-daemon --max-workers=1 :app:assembleRelease
+```
+
+The APK is written to `android/app/build/outputs/apk/release/app-release.apk`. This explicit debug-signing opt-in is suitable for device testing but must never be submitted to Google Play or treated as a long-lived production signing identity.
 
 Install it on a connected device with USB debugging enabled:
 
-```powershell
-adb install -r artifacts\RuleSwitch-1.0.0-arm64.apk
+```bash
+adb install -r android/app/build/outputs/apk/release/app-release.apk
 ```
 
-To rebuild the APK locally in PowerShell:
+### Locally signed production APK
 
-```powershell
-$env:JAVA_HOME = "$env:LOCALAPPDATA\Programs\Microsoft\jdk-17.0.10.7-hotspot"
-$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
-Set-Location android
-.\gradlew.bat :app:assembleRelease
-```
+Generate and securely back up a private Android upload keystore outside the repository. Then set all four values below in the shell that runs Gradle (or use the matching lower-camel-case properties in a private `~/.gradle/gradle.properties`):
 
-The rebuilt file is written to `android/app/build/outputs/apk/release/app-release.apk`. The local release configuration currently uses the generated Android debug keystore so the APK can be installed directly. Configure a private production upload keystore before publishing to Google Play or distributing a long-lived production release.
+| Environment variable | Required value | Gradle property alternative |
+| --- | --- | --- |
+| `RULESWITCH_UPLOAD_STORE_FILE` | Absolute keystore path, or a path relative to `android/` | `ruleswitchUploadStoreFile` |
+| `RULESWITCH_UPLOAD_STORE_PASSWORD` | Keystore password | `ruleswitchUploadStorePassword` |
+| `RULESWITCH_UPLOAD_KEY_ALIAS` | Upload key alias | `ruleswitchUploadKeyAlias` |
+| `RULESWITCH_UPLOAD_KEY_PASSWORD` | Upload key password | `ruleswitchUploadKeyPassword` |
+
+Run `./gradlew --no-daemon --max-workers=1 :app:assembleRelease` from `android/`. The keystore and its passwords are deliberately absent from `.env.example`, Git, and the Docker image. If any signing value is provided, all four are required.
 
 ### Hosted builds
 
@@ -113,7 +145,7 @@ eas build --platform android --profile preview
 npm run build:android
 ```
 
-`eas init` replaces the safe `SET_WITH_EAS_INIT` value in `app.json`. Android application ID is `com.ruleswitch.game`; change it before the first store submission if another owner controls that identifier.
+`eas init` replaces the safe `SET_WITH_EAS_INIT` value in `app.json`; this real EAS project UUID is the only currently missing hosted-build value. EAS can manage the Android upload credential without committing a keystore. Android application ID is `com.ruleswitch.game`; change it before the first store submission if another owner controls that identifier.
 
 The generated `android/` native project is included for local APK builds. Re-run prebuild after changing native Expo configuration, then review the generated changes:
 
@@ -130,7 +162,7 @@ Copy `.env.example` to `.env` and set:
 
 Only non-sensitive game events and performance properties are captured. The app never identifies a guest. Sentry default PII collection is disabled.
 
-For Sentry source-map upload in EAS, add `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` as EAS secrets, then configure the Sentry Expo build plugin for that organization/project. Those values must not use the `EXPO_PUBLIC_` prefix.
+Sentry event uploads work with only the public DSN, but readable production stack traces also require source maps. Source-map upload is not enabled in the current generic configuration because a real Sentry organization and project have not been supplied. When enabling it, configure the Sentry Expo build plugin for that organization/project and add `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` as EAS secrets. Those values must not use the `EXPO_PUBLIC_` prefix and are not Coolify runtime values.
 
 ## Architecture
 

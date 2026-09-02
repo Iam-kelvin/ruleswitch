@@ -38,7 +38,7 @@ export default function StatsScreen() {
             return (
               <View key={category} style={[styles.ruleRow, index < RULE_CATEGORIES.length - 1 && { borderBottomColor: palette.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
                 <View style={styles.ruleTop}><Text style={[styles.ruleName, { color: palette.text }]}>{CATEGORY_LABELS[category]}{data.masteredRuleCategories.includes(category) ? <Text style={{ color: palette.primary }}> · MASTERED</Text> : null}</Text><Text style={[styles.ruleValue, { color: palette.textMuted }]}>{stat.attempts ? `${Math.round(accuracy * 100)}% · ${stat.correct}/${stat.attempts}` : 'Not played'}</Text></View>
-                <ProgressBar value={accuracy} color={stat.attempts ? palette.primary : palette.border} />
+                <ProgressBar accessibilityLabel={`${CATEGORY_LABELS[category]} accuracy`} value={accuracy} color={stat.attempts ? palette.primary : palette.border} />
               </View>
             );
           })}
@@ -76,9 +76,9 @@ const styles = StyleSheet.create({
   emptyCopy: { fontSize: 13, lineHeight: 19, marginTop: 5 },
   rulePanel: { paddingVertical: 2 },
   ruleRow: { paddingVertical: 14 },
-  ruleTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 9 },
-  ruleName: { fontSize: 14, fontWeight: '800' },
-  ruleValue: { fontSize: 12 },
+  ruleTop: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 6, marginBottom: 9 },
+  ruleName: { flexShrink: 1, fontSize: 14, fontWeight: '800' },
+  ruleValue: { fontSize: 12, textAlign: 'right' },
   bestPanel: { paddingVertical: 3 },
   bestRow: { minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   bestLabel: { fontSize: 14 },
